@@ -107,6 +107,48 @@ orch_route({ decisions: '[{"candidateId":"cand-xxxxxxxx","decision":"ignore","re
 
 候选键 = `kind|workspace|ref|fingerprint`。同一件事状态没变就不会重复产生候选；router 跑完会把这一批里没被决策的候选标 `expired`，所以不会每 30 分钟重复叫同一个 router。
 
+## 同一工作区、多需求多分支：怎么不串
+
+这个场景很常见：一个仓库里同时有几十上百条工作线（不同需求、不同分支），而席位都在同一个工作目录里跑就会串。实测一个真实仓库近 30 天有过 **200+ 条**不同工作线，全都落在同一个 cwd。
+
+两道防线，一起用：
+
+### L1：分支校验 + cwd 写锁（默认就有）
+
+- `orch_submit({ branch: 'feature/xxx' })`：派发前比对 cwd 当前 checkout 的分支，**不符直接拒绝**并告诉你当前是哪个分支——不让席位在错的分支上开跑。
+- 同一 cwd 同时只允许**一个可写席位**（`cwd_busy` 拒第二个）。只读席位不加锁，因为不改文件、互不冲突。
+- 锁带过期回收（2 倍超时），进程崩了不会永久占着。
+
+### L2：worktree 隔离（`worktree: 'true'`）
+
+```js
+orch_submit({ goal: '...', acceptance: '...', cwd: '/path/to/repo', worktree: 'true', branch: 'feature/xxx' })
+```
+
+派发时用 `git worktree add --detach` 在仓库旁建 `<repo>-orch/<taskId>`，席位在该目录里干活：
+
+- **`--detach` 不碰你当前 checkout 的分支**
+- 基点 = 声明的 branch（不存在会报 `branch_not_found`，也会查 `origin/<branch>`），否则当前 HEAD
+- 天然隔离分支、未提交改动、并发席位
+- 同一 taskId 重复派发复用已有目录
+
+**注意**：worktree 里 husky 之类 git 钩子通常不生效，席位提示词里会明确告知它「别因为没报错就以为检查跑过了」。
+
+### worktree 不会被自动删
+
+删目录不可逆，所以本插件**只提示、不自动做**：
+
+```js
+orch_worktree({ action: 'list' })                        // 看有哪些、还在不在
+orch_worktree({ action: 'remove', taskId: 'task-xxx' })  // 确认合并/丢弃后清理
+```
+
+`orch_status` 的返回里也带 worktree 路径和清理提示。有席位还在跑时会拒绝删除。
+
+### 非 git 目录
+
+优雅降级：不阻断派发，返回里标 `warning: not_a_git_repo` / `worktree_unavailable_not_a_git_repo`，让你知道这一层没校验。
+
 ## 安装
 
 ```sh
