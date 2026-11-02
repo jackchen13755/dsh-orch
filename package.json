@@ -22,6 +22,9 @@
     "@deepseek-ai/schemastery": ">=3.18 <4"
   },
   "scripts": {
-    "check": "bash scripts/build.sh"
+    "check": "bash scripts/build.sh",
+    "smoke": "node scripts/smoke.mjs",
+    "heal": "bash scripts/heal-env.sh",
+    "postinstall": "bash scripts/heal-env.sh"
   }
 }

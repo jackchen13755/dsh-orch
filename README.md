@@ -48,8 +48,14 @@ orch_status({ taskId: "task-xxxxxxxx" })        // 看进度和半成品
 ## 安装
 
 ```sh
-dsh plugin add github:jackchen13755/dsh-orch
+dsh plugin --profile desktop add github:jackchen13755/dsh-orch
 ```
+
+装完会跑 `postinstall`（`scripts/heal-env.sh`）：把 `@deepseek-ai/dsh-tools` / `dsh-llm` / `schemastery` 链回**宿主那一份实例**。
+
+这一步不是可选优化，原因写在脚本头部：peer 包不随插件安装，缺了 ESM 解析失败，宿主里表现为 `[no-fiber]`；而必须是宿主同实例，因为 schemastery 的 schema 由宿主按实例校验。反过来 `npm i` 会把不在依赖树里的手链软链当 extraneous 剪掉，所以每次装完都要自愈。
+
+宿主探测顺序：`DSH_HOST_NODE_MODULES` 显式指定 > 含完整 `@deepseek-ai/dsh` 的安装（mtime 新者优先）> 其余含 peer 的目录。
 
 ## 状态与恢复
 
