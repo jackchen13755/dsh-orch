@@ -1,0 +1,14 @@
+# dsh-orch bundle patch: inserts the plugin row into the composition.
+# Later layers (profile cordis.patch.yml, --patch) may override this row by id.
+#
+# 为什么必须有这个文件：宿主在装配/安装时会剪掉「没有 dsh 字段」的 bundles 条目，
+# 那些插件装得上、却永远不装配（表现为 [no-fiber] 或干脆消失）。声明 dsh.bundle.patch
+# 之后它才被当作 bundle 插件对待。
+- insert:
+    - id: dsh-orch
+      name: '@dsh-external/dsh-orch'
+      # config:
+      #   maxSeats: 3              # 单张工作单的席位上限
+      #   maxConcurrency: 2        # 同时运行的席位数
+      #   runTimeoutMinutes: 30    # 单席位超时
+      #   agentPreset: standard    # 席位使用的 agent preset
