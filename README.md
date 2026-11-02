@@ -48,12 +48,35 @@ orch_status({ taskId: "task-xxxxxxxx" })        // 看进度和半成品
 ## 安装
 
 ```sh
-dsh plugin --profile desktop add github:jackchen13755/dsh-orch
+dsh plugin --profile desktop add github:jackchen13755/dsh-orch#v0.1.2
 ```
 
 装完会跑 `postinstall`（`scripts/heal-env.sh`）：把 `@deepseek-ai/dsh-tools` / `dsh-llm` / `schemastery` 链回**宿主那一份实例**。
 
 这一步不是可选优化，原因写在脚本头部：peer 包不随插件安装，缺了 ESM 解析失败，宿主里表现为 `[no-fiber]`；而必须是宿主同实例，因为 schemastery 的 schema 由宿主按实例校验。反过来 `npm i` 会把不在依赖树里的手链软链当 extraneous 剪掉，所以每次装完都要自愈。
+
+### 两个安装期坑（pnpm 11）
+
+**1. 构建审批要精确标识符。** pnpm 11 默认拒绝执行 git 依赖的脚本，报 `ERR_PNPM_IGNORED_BUILDS`。放行时写的 key 必须是**带解析后 commit 的完整标识符**，只写包名不匹配：
+
+```yaml
+# <profile>/pnpm-workspace.yaml
+allowBuilds:
+  "@dsh-external/dsh-orch@https://codeload.github.com/jackchen13755/dsh-orch/tar.gz/<commit-sha>": true
+```
+
+commit 一变（换了 tag），这个 key 也要跟着改。
+
+**2. store 版本必须与宿主内置 pnpm 一致。** 宿主内置 pnpm 11 用 `store/v11`；如果 profile 早先用 pnpm 10（`store/v10`）装过，任何 `dsh plugin add` 都会报 `ERR_PNPM_UNEXPECTED_STORE`，需要先在 profile 里跑一次 `pnpm install` 完成迁移。
+
+顺带：如果本机 https 到 github.com 不通（api/codeload 通），可在命令前加一次性传输改写，不必改全局配置：
+
+```sh
+GIT_CONFIG_COUNT=1 \
+GIT_CONFIG_KEY_0='url.git@github.com:.insteadOf' \
+GIT_CONFIG_VALUE_0='https://github.com/' \
+dsh plugin --profile desktop add github:jackchen13755/dsh-orch#v0.1.2
+```
 
 宿主探测顺序：`DSH_HOST_NODE_MODULES` 显式指定 > 含完整 `@deepseek-ai/dsh` 的安装（mtime 新者优先）> 其余含 peer 的目录。
 
