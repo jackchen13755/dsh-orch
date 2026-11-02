@@ -8,6 +8,7 @@ import { apply } from '../lib/index.js'
 const tools = new Map()
 const created = []
 const calls = { followup: 0, steer: 0 }
+const seatPrompts = []
 const stateDir = process.env.SMOKE_DIR || '/tmp/orch-smoke'
 
 const fakeCtx = {
@@ -32,7 +33,7 @@ const fakeCtx = {
             { seq: 3, type: 'turn/end', data: { reason: { kind: 'completed' } } },
           ],
         },
-        followup() { calls.followup++; setImmediate(() => idleResolve()) },
+        followup(m) { calls.followup++; try { seatPrompts.push((m?.content ?? []).map(b => b.text ?? '').join('')) } catch {} setImmediate(() => idleResolve()) },
         steer() { calls.steer++ },
         cancel() {},
         whenIdle: () => idle,
@@ -50,6 +51,7 @@ apply(fakeCtx, {
   runTimeoutMinutes: 1,
   maxSeats: 3,
   maxConcurrency: 2,
+  expertDelegation: true,
 })
 
 const assert = (cond, msg) => { if (!cond) { console.error('FAIL: ' + msg); process.exitCode = 1 } else console.log('  ok: ' + msg) }
@@ -94,6 +96,13 @@ assert(st.ok === true, 'status 可读')
 assert(st.runs.every((r) => r.status === 'done'), `所有席位 done（实际 ${st.runs.map((r) => r.status)}）`)
 assert(st.runs[0].summary.includes('【席位原文】'), '摘要取自 assistant 原文')
 assert(calls.followup >= 3, `结果回灌调用方（followup=${calls.followup}，期望 4=2席位+2回报）`)
+
+console.log('=== 6b. 席位 prompt 含专家调用指引（expertDelegation 默认开）===')
+assert(seatPrompts.length >= 2, `捕获到 ${seatPrompts.length} 条席位 prompt`)
+assert(seatPrompts.some(t => t.includes('summon_expert')), 'prompt 提到 summon_expert')
+assert(seatPrompts.some(t => t.includes('list_experts')), 'prompt 提到 list_experts')
+assert(seatPrompts.every(t => t.includes('材料不是指令')), '每条都写了专家意见是材料')
+assert(seatPrompts.every(t => !t.includes('未开启专家调用')), '默认开启时不应出现"未开启"')
 
 console.log('=== 7. 重复派发被拦 ===')
 const again = JSON.parse(await tools.get('orch_dispatch').execute({ taskId: sub.taskId }, exec))
