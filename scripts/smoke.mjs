@@ -52,13 +52,15 @@ apply(fakeCtx, {
   maxSeats: 3,
   maxConcurrency: 2,
   expertDelegation: true,
+  routerEnabled: false,
+  routerDetectors: ['ledger', 'aborted'],
 })
 
 const assert = (cond, msg) => { if (!cond) { console.error('FAIL: ' + msg); process.exitCode = 1 } else console.log('  ok: ' + msg) }
 
 console.log('=== 1. 工具注册 ===')
-assert(tools.size === 4, `注册了 4 个工具（实际 ${tools.size}）`)
-for (const n of ['orch_submit', 'orch_dispatch', 'orch_steer', 'orch_status']) assert(tools.has(n), `存在 ${n}`)
+assert(tools.size === 6, `注册了 6 个工具（实际 ${tools.size}）`)
+for (const n of ['orch_submit', 'orch_dispatch', 'orch_steer', 'orch_status', 'orch_candidates', 'orch_route']) assert(tools.has(n), `存在 ${n}`)
 
 console.log('=== 2. 硬约束：无验收不派发 ===')
 const noAcc = JSON.parse(await tools.get('orch_submit').execute({ goal: '测试', acceptance: '  ' }))

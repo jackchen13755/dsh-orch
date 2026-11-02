@@ -76,7 +76,36 @@ orch_submit({ goal: "评审需求 6080 的方案", acceptance: "列出 3 个风�
 orch_dispatch({ taskId: "task-xxxxxxxx" })      // 立即返回 runId
 orch_steer({ runId: "run-xxxxxxxx", message: "先看后端接口签名，别急着看 UI" })
 orch_status({ taskId: "task-xxxxxxxx" })        // 看进度和半成品
+orch_candidates({ scan: true })                 // 看候选队列（可先扫一轮）
+orch_route({ decisions: '[{"candidateId":"cand-xxxxxxxx","decision":"ignore","reason":"误报"}]' })
 ```
+
+## 路由器：自动找出「没闭合的事」
+
+默认开启，每 30 分钟扫一次本地记录，把「可能没完的事」变成**候选**，再按工作区叫一个**只读** router 来分诊。
+
+**为什么按工作区分**：三个硬理由——推送身份不同（部分仓库用专用机器人身份、其余用个人身份）、仓库性质不同（公开仓库 vs 内网仓库）、项目规矩不同（有的项目有「不得改写现有文案」这类硬口径）。一个 router 同时持有三套口径迟早串。
+
+**形态是「按需唤醒」而不是「常驻」**：某区有 pending 候选、且该区没有运行中的 router、且总数没超限，才建一个一次性会话（cwd 锁该工作区），处理完即结束，然后 5 秒后链式处理下一个区。空闲零成本。
+
+**router 权限固定 `read-only`**：只决策、不动代码，动手一律交给席位。
+
+### 两个探测器（都是实测有信号的）
+
+| 探测器 | 看什么 | 近 30 天实测 |
+| --- | --- | --- |
+| `ledger` | `~/.dsh/completion-ledger/` 里**没证据且没标 done/dropped** 的条目 | 10 条 |
+| `aborted` | 主会话最后一次 `turn/end` 是 `aborted`（活干到一半断了） | 11 条 |
+
+判「未收口」的语义很关键：**有证据，或状态是 done/dropped，才算收了**。一开始把「有证据但 status 没写成 done」也当未收口，算出 124 条假待办（真实只有 9 条）——那样的 router 你两天就会关掉。
+
+### 一个探测器默认关闭
+
+`askPending`（提问未答）**保留实现但不启用**：实测近 30 天 641 个会话、54 个主会话用过 `ask_user_question`，**未答 0 条**——它是阻塞工具，不答就不返回，「未答」在日志里几乎不存在。等哪天日志形态变了再打开。
+
+### 幂等与防循环
+
+候选键 = `kind|workspace|ref|fingerprint`。同一件事状态没变就不会重复产生候选；router 跑完会把这一批里没被决策的候选标 `expired`，所以不会每 30 分钟重复叫同一个 router。
 
 ## 安装
 
