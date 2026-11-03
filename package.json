@@ -1,6 +1,6 @@
 {
   "name": "@dsh-external/dsh-orch",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "异步多席位智能体编排器：派发不阻塞、可中途 steer 改方向、结果异步回灌调用方会话",
   "private": true,
   "type": "module",

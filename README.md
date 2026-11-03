@@ -127,6 +127,22 @@ orch_workspace({ action: 'set', workspace: '/path/to/repo', enabled: 'false' })
 
 `askPending`（提问未答）**保留实现但不启用**：实测 641 个会话里 **未答 0 条**——它是阻塞工具，不答就不返回，「未答」在日志里几乎不存在。
 
+### 防回环（关键）
+
+本插件自己会创建两类会话：**router**（`orch-router-*`）和**席位**（`orch-run-*`）。它们的 `turn/end` 同样会走 `session/event` 总线——如果照单处理就会**自己触发自己**：
+
+实测有 router 会话自己调了 `ledger_open` / `ledger_evidence` 写账本 → 新指纹 → 新候选 → 再唤醒 router → 无限套娃。
+
+所以事件处理第一步就过滤：
+
+| 会话 | 是否处理 | 为什么 |
+| --- | --- | --- |
+| `orch-router-*` / `orch-run-*` | **跳过** | 本插件自己创建的，处理会成环 |
+| `header.origin === 'subagent'` | **跳过** | 子 agent 的回合不代表用户工作线结束 |
+| 普通用户会话 | 处理 | 这才是真实信号 |
+
+代价说明：席位会话写下的未收口账本不会被它的 `turn/end` 立刻触发分诊；等用户下次在该工作区干活时会自然被发现。这是刻意取舍——**宁可晚一轮，不要成环**。
+
 ### 幂等与防循环
 
 候选键 = `kind|workspace|ref|fingerprint`。同一件事状态没变就不会重复产生；router 跑完把这一批里没被决策的候选标 `expired`；防抖窗口内（默认 30 秒）同一工作区只查一次。
