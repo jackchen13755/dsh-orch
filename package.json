@@ -1,6 +1,6 @@
 {
   "name": "@dsh-external/dsh-orch",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "异步多席位智能体编排器：派发不阻塞、可中途 steer 改方向、结果异步回灌调用方会话",
   "private": true,
   "type": "module",
@@ -22,6 +22,13 @@
     "manifestVersion": 1,
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-client-ui-sidebar-right"
+      ]
     }
   },
   "peerDependencies": {
@@ -34,5 +41,14 @@
     "smoke": "node scripts/smoke.mjs",
     "heal": "bash scripts/heal-env.sh",
     "postinstall": "bash scripts/heal-env.sh"
+  },
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json"
   }
 }
